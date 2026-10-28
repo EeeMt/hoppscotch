@@ -49,7 +49,7 @@
                     class="svg-icons ml-2 cursor-help text-green-500 focus:outline-none"
                   />
                   <HoppButtonSecondary
-                    v-else
+                    v-else-if="supportsEmailVerification(platform.auth)"
                     :label="t('settings.verify_email')"
                     :icon="IconVerified"
                     class="ml-2 px-1 py-0"
@@ -86,6 +86,7 @@
 </template>
 
 <script setup lang="ts">
+import { supportsEmailVerification } from "~/helpers/auth-provider-login"
 import { computed, ref, watchEffect } from "vue"
 
 import { platform } from "~/platform"

@@ -66,6 +66,7 @@
 </template>
 
 <script setup lang="ts">
+import { isOIDCLoopbackUri } from "@hoppscotch/common/helpers/oidc-login-return"
 import { useReadonlyStream } from "@hoppscotch/common/composables/stream"
 import { platform } from "@hoppscotch/common/platform"
 import { useI18n } from "@hoppscotch/common/composables/i18n"
@@ -96,21 +97,6 @@ const DeviceTokenResponse = z.object({
   refresh_token: z.string(),
 })
 
-function isLoopbackUri(uri: string): boolean {
-  try {
-    const url = new URL(uri)
-    const loopbackHosts = ["localhost", "127.0.0.1", "[::1]"]
-    return (
-      url.protocol === "http:" &&
-      !url.username &&
-      !url.password &&
-      loopbackHosts.includes(url.hostname)
-    )
-  } catch {
-    return false
-  }
-}
-
 async function proceedLogin() {
   loginConfirmState.value = "loading"
 
@@ -122,7 +108,7 @@ async function proceedLogin() {
       throw new Error("Redirect URI not found")
     }
 
-    if (!isLoopbackUri(redirect_uri)) {
+    if (!isOIDCLoopbackUri(redirect_uri)) {
       throw new Error("Invalid redirect URI: must be a loopback address")
     }
 
@@ -147,7 +133,6 @@ async function proceedLogin() {
 
     loginConfirmState.value = "done"
   } catch (e) {
-    console.error(e)
     loginConfirmState.value = "error"
   }
 }

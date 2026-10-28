@@ -35,6 +35,7 @@ const currentTime = new Date();
 
 const user: AuthUser = {
   uid: '123344',
+  emailVerified: false,
   email: 'dwight@dundermifflin.com',
   displayName: 'Dwight Schrute',
   photoURL: 'https://en.wikipedia.org/wiki/Dwight_Schrute',
@@ -672,6 +673,7 @@ describe('UserService', () => {
           uid: user.uid,
           displayName: user.displayName,
           email: user.email,
+          emailVerified: user.emailVerified,
           photoURL: user.photoURL,
           isAdmin: user.isAdmin,
           currentRESTSession: user.currentRESTSession,

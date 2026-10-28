@@ -1,0 +1,13 @@
+{
+  auto_https off
+  admin off
+}
+
+https://{$OIDC_TLS_HOST}:443 {
+  tls /run/oidc/server.pem /run/oidc/server-key.pem
+  reverse_proxy {$AUTHENTIK_TEST_UPSTREAM}
+}
+
+http://{$OIDC_HTTP_HOST}:80 {
+  reverse_proxy {$AUTHENTIK_TEST_UPSTREAM}
+}

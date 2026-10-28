@@ -1,4 +1,10 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { OIDCAccountLinkingService } from './oidc/oidc-account-linking.service';
+import {
+  ConflictException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { MailerService } from 'src/mailer/mailer.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UserService } from 'src/user/user.service';
@@ -25,7 +31,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { RESTError } from 'src/types/RESTError';
 import { AuthUser, IsAdmin } from 'src/types/AuthUser';
-import { VerificationToken } from 'src/generated/prisma/client';
+import { Prisma, VerificationToken } from 'src/generated/prisma/client';
 import { Origin } from './helper';
 import { ConfigService } from '@nestjs/config';
 import { InfraConfigService } from 'src/infra-config/infra-config.service';
@@ -182,8 +188,12 @@ export class AuthService {
    * @param SSOUserData User data from SSO providers (Magic,Google,Github,Microsoft)
    * @returns Either of existing user provider Account
    */
-  async checkIfProviderAccountExists(user: AuthUser, SSOUserData) {
-    const provider = await this.prisma.account.findUnique({
+  async checkIfProviderAccountExists(
+    user: AuthUser,
+    SSOUserData,
+    db: Prisma.TransactionClient = this.prisma,
+  ) {
+    const provider = await db.account.findUnique({
       where: {
         verifyProviderAccount: {
           provider: SSOUserData.provider,
@@ -197,12 +207,68 @@ export class AuthService {
     return O.some(provider);
   }
 
-  /**
-   * Create User (if not already present) and send email to initiate Magic-Link auth
-   *
-   * @param email User's email
-   * @returns Either containing DeviceIdentifierToken
-   */
+  /** Keep legacy identity checks and writes in the shared email transaction. */
+  private withLegacyLogin<T>(
+    email: string,
+    provider: string,
+    id: string,
+    operation: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    return new OIDCAccountLinkingService(this.prisma).withLegacyLogin(
+      email,
+      provider,
+      id,
+      operation,
+    );
+  }
+
+  async resolveSSOUser(accessToken: string, refreshToken: string, profile) {
+    return this.withLegacyLogin(
+      profile.emails[0].value,
+      profile.provider,
+      profile.id,
+      async (tx) => {
+        const user = await this.usersService.findUserByEmail(
+          profile.emails[0].value,
+          tx,
+        );
+        if (O.isNone(user))
+          return this.usersService.createUserSSO(
+            accessToken,
+            refreshToken,
+            profile,
+            tx,
+          );
+
+        // Preserve legacy profile completion and association behavior, but keep
+        // every read/write inside the same email lock as the OIDC boundary check.
+        if (!user.value.displayName || !user.value.photoURL) {
+          const updated = await this.usersService.updateUserDetails(
+            user.value,
+            profile,
+            tx,
+          );
+          if (E.isLeft(updated)) throw new UnauthorizedException(updated.left);
+        }
+        const existing = await this.checkIfProviderAccountExists(
+          user.value,
+          profile,
+          tx,
+        );
+        if (O.isNone(existing))
+          await this.usersService.createProviderAccount(
+            user.value,
+            accessToken,
+            refreshToken,
+            profile,
+            tx,
+          );
+        return user.value;
+      },
+    );
+  }
+
+  /** Create/find the local user, then send the magic link after releasing the lock. */
   async signInMagicLink(email: string, origin: string) {
     if (!validateEmail(email))
       return E.left({
@@ -211,14 +277,20 @@ export class AuthService {
       });
 
     let user: AuthUser;
-    const queriedUser = await this.usersService.findUserByEmail(email);
-
-    if (O.isNone(queriedUser)) {
-      user = await this.usersService.createUserViaMagicLink(email);
-    } else {
-      user = queriedUser.value;
+    try {
+      user = await this.withLegacyLogin(email, 'magic', email, async (tx) => {
+        const queriedUser = await this.usersService.findUserByEmail(email, tx);
+        return O.isNone(queriedUser)
+          ? this.usersService.createUserViaMagicLink(email, tx)
+          : queriedUser.value;
+      });
+    } catch (error) {
+      if (!(error instanceof ConflictException)) throw error;
+      return E.left({
+        message: 'OIDC_IDENTITY_EMAIL_CONFLICT',
+        statusCode: HttpStatus.CONFLICT,
+      });
     }
-
     const generatedTokens = await this.generateMagicLinkTokens(user);
 
     // check to see if origin is valid
@@ -278,24 +350,35 @@ export class AuthService {
      * * Check to see if entry for Magic-Link is present in the Account table for user
      * * If user was created with another provider findUserById may return true
      */
-    const profile = {
-      provider: 'magic',
-      id: user.value.email,
-    };
-    const providerAccountExists = await this.checkIfProviderAccountExists(
-      user.value,
-      profile,
-    );
-
-    if (O.isNone(providerAccountExists)) {
-      await this.usersService.createProviderAccount(
-        user.value,
-        null,
-        null,
-        profile,
+    try {
+      await this.withLegacyLogin(
+        user.value.email,
+        'magic',
+        user.value.email,
+        async (tx) => {
+          const profile = { provider: 'magic', id: user.value.email };
+          const existing = await this.checkIfProviderAccountExists(
+            user.value,
+            profile,
+            tx,
+          );
+          if (O.isNone(existing))
+            await this.usersService.createProviderAccount(
+              user.value,
+              null,
+              null,
+              profile,
+              tx,
+            );
+        },
       );
+    } catch (error) {
+      if (!(error instanceof ConflictException)) throw error;
+      return E.left({
+        message: 'OIDC_IDENTITY_EMAIL_CONFLICT',
+        statusCode: HttpStatus.CONFLICT,
+      });
     }
-
     const currentTime = new Date();
     if (currentTime > passwordlessTokens.value.expiresOn)
       return E.left({
@@ -320,6 +403,10 @@ export class AuthService {
         statusCode: HttpStatus.NOT_FOUND,
       });
 
+    await this.prisma.user.update({
+      where: { uid: passwordlessTokens.value.userUid },
+      data: { emailVerified: true },
+    });
     this.usersService.updateUserLastLoggedOn(passwordlessTokens.value.userUid);
 
     return E.right(tokens.right);

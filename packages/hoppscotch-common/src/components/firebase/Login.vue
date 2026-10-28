@@ -36,6 +36,7 @@
           <HoppSmartItem
             v-for="loginItem in additionalLoginItems"
             :key="loginItem.id"
+            :loading="additionalLoading === loginItem.id"
             :icon="loginItem.icon"
             :label="loginItem.text(t)"
             @click="doAdditionalLoginItemClickAction(loginItem)"
@@ -145,6 +146,7 @@
 </template>
 
 <script setup lang="ts">
+import { parseAdditionalAuthProviders } from "~/helpers/auth-provider-login"
 import { Ref, onMounted, ref } from "vue"
 
 import { useI18n } from "@composables/i18n"
@@ -202,9 +204,17 @@ type AuthProviderItem = {
 let allowedAuthProviders: AuthProviderItem[] = []
 const additionalLoginItems: LoginItemDef[] = []
 
+const additionalLoading = ref<string | null>(null)
 const doAdditionalLoginItemClickAction = async (item: LoginItemDef) => {
-  await item.onClick()
-  emit("hide-modal")
+  additionalLoading.value = item.id
+  try {
+    await item.onClick()
+    emit("hide-modal")
+  } catch {
+    toast.error(t("auth.oidc_failure"))
+  } finally {
+    additionalLoading.value = null
+  }
 }
 
 onMounted(async () => {
@@ -230,31 +240,15 @@ onMounted(async () => {
 
   // setup the additional login items
   platform.auth.additionalLoginItems?.forEach((item) => {
-    if (res.right.includes(item.id)) {
-      additionalLoginItems.push(item)
-    }
-
-    // since the BE send the OIDC auth providers as OIDC:providerName,
-    // we need to split the string and use the providerName as the text
-    if (item.id === "OIDC") {
-      res.right
-        .filter((provider) => provider.startsWith("OIDC"))
-        .forEach((provider) => {
-          const OIDCName = provider.split(":")[1]
-          const loginItemText = OIDCName
-            ? () =>
-                t("auth.continue_with_auth_provider", {
-                  provider: OIDCName,
-                })
-            : item.text
-
-          const OIDCLoginItem = {
-            ...item,
-            text: loginItemText,
-          }
-          additionalLoginItems.push(OIDCLoginItem)
-        })
-    }
+    parseAdditionalAuthProviders(res.right, item.id).forEach(({ id, name }) => {
+      additionalLoginItems.push({
+        ...item,
+        id,
+        text: name
+          ? () => t("auth.continue_with_auth_provider", { provider: name })
+          : item.text,
+      })
+    })
   })
 
   isLoadingAllowedAuthProviders.value = false

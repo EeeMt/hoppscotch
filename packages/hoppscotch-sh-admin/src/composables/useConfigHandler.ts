@@ -23,6 +23,7 @@ import {
   ConfigTransform,
   GITHUB_CONFIGS,
   GOOGLE_CONFIGS,
+  OIDC_CONFIGS,
   MAIL_CONFIGS,
   MICROSOFT_CONFIGS,
   MOCK_SERVER_CONFIGS,
@@ -85,6 +86,25 @@ export function useConfigHandler(updatedConfigs?: ServerConfigs) {
     // Transforming the fetched data into a Configs object
     currentConfigs.value = {
       providers: {
+        oidc: {
+          name: 'oidc',
+          enabled: allowedAuthProviders.value.includes(AuthProvider.Oidc),
+          fields: {
+            issuer: getFieldValue(InfraConfigEnum.OidcIssuer),
+            discovery_url: getFieldValue(InfraConfigEnum.OidcDiscoveryUrl),
+            client_id: getFieldValue(InfraConfigEnum.OidcClientId),
+            client_secret: getFieldValue(InfraConfigEnum.OidcClientSecret),
+            callback_url: getFieldValue(InfraConfigEnum.OidcCallbackUrl),
+            scope:
+              getFieldValue(InfraConfigEnum.OidcScope) ||
+              'openid,profile,email',
+            token_endpoint_auth_method:
+              getFieldValue(InfraConfigEnum.OidcTokenEndpointAuthMethod) ||
+              'client_secret_basic',
+            allow_insecure_http:
+              getFieldValue(InfraConfigEnum.OidcAllowInsecureHttp) || 'false',
+          },
+        },
         google: {
           name: 'google',
           enabled: allowedAuthProviders.value.includes(AuthProvider.Google),
@@ -252,6 +272,13 @@ export function useConfigHandler(updatedConfigs?: ServerConfigs) {
   const transformInfraConfigs = () => {
     const updatedWorkingConfigs: ConfigTransform[] = [
       {
+        config: OIDC_CONFIGS.filter(
+          (c) => c.name !== InfraConfigEnum.OidcCallbackUrl,
+        ),
+        enabled: updatedConfigs?.providers.oidc.enabled,
+        fields: updatedConfigs?.providers.oidc.fields,
+      },
+      {
         config: GOOGLE_CONFIGS,
         enabled: updatedConfigs?.providers.google.enabled,
         fields: updatedConfigs?.providers.google.fields,
@@ -336,6 +363,12 @@ export function useConfigHandler(updatedConfigs?: ServerConfigs) {
     updateProviderStatus: UseMutationResponse<EnableAndDisableSsoMutation>
   ) => {
     const updatedAllowedAuthProviders: EnableAndDisableSsoArgs[] = [
+      {
+        provider: AuthProvider.Oidc,
+        status: updatedConfigs?.providers.oidc.enabled
+          ? ServiceStatus.Enable
+          : ServiceStatus.Disable,
+      },
       {
         provider: AuthProvider.Google,
         status: updatedConfigs?.providers.google.enabled

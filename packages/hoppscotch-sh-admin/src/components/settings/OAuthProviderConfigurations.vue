@@ -8,6 +8,7 @@
     </div>
 
     <div class="space-y-8 sm:px-8 md:col-span-2">
+      <p>{{ t('configs.auth_providers.oidc_restart') }}</p>
       <section>
         <h4 class="font-semibold text-secondaryDark">
           {{ t('configs.auth_providers.title') }}
@@ -45,8 +46,48 @@
               >
                 <label>{{ makeReadableKey(field.name, true) }}</label>
                 <span class="flex max-w-lg">
+                  <select
+                    v-if="
+                      provider.name === 'oidc' &&
+                      [
+                        'token_endpoint_auth_method',
+                        'allow_insecure_http',
+                      ].includes(field.key)
+                    "
+                    v-model="
+                      provider.fields[
+                        field.key as keyof (typeof provider)['fields']
+                      ]
+                    "
+                    class="my-2 rounded border border-divider bg-primaryLight p-2 w-full min-w-0"
+                    :aria-label="field.name"
+                  >
+                    <option
+                      v-for="option in field.key === 'allow_insecure_http'
+                        ? ['false', 'true']
+                        : ['client_secret_basic', 'client_secret_post']"
+                      :key="option"
+                      :value="option"
+                    >
+                      {{
+                        t(
+                          OIDC_OPTION_LABELS[
+                            option as keyof typeof OIDC_OPTION_LABELS
+                          ],
+                        )
+                      }}
+                    </option>
+                  </select>
                   <HoppSmartInput
-                    v-model="provider.fields[field.key as keyof typeof provider['fields']]"
+                    v-else
+                    :disabled="
+                      provider.name === 'oidc' && field.key === 'callback_url'
+                    "
+                    v-model="
+                      provider.fields[
+                        field.key as keyof (typeof provider)['fields']
+                      ]
+                    "
                     :type="
                       isMasked(provider.name, field.key) ? 'password' : 'text'
                     "
@@ -88,6 +129,7 @@ import { reactive } from 'vue';
 import { useI18n } from '~/composables/i18n';
 import {
   ServerConfigs,
+  OIDC_OPTION_LABELS,
   SsoAuthProviders,
   useConfigValidation,
 } from '~/helpers/configs';
@@ -118,8 +160,16 @@ const capitalize = (text: string) =>
 type ProviderFieldKeys = keyof ProviderFields;
 
 type ProviderFields = {
-  [Field in keyof ServerConfigs['providers'][SsoAuthProviders]['fields']]: boolean;
-} & Partial<{ tenant: boolean }>;
+  [
+    Field in keyof ServerConfigs['providers'][SsoAuthProviders]['fields']
+  ]: boolean;
+} & Partial<{
+  tenant: boolean;
+  issuer: boolean;
+  discovery_url: boolean;
+  token_endpoint_auth_method: boolean;
+  allow_insecure_http: boolean;
+}>;
 
 type ProviderFieldMetadata = {
   name: string;
@@ -129,24 +179,44 @@ type ProviderFieldMetadata = {
 
 const providerConfigFields = <ProviderFieldMetadata[]>[
   {
+    name: t('configs.auth_providers.oidc_issuer'),
+    key: 'issuer',
+    applicableProviders: ['oidc'],
+  },
+  {
+    name: t('configs.auth_providers.oidc_discovery_url'),
+    key: 'discovery_url',
+    applicableProviders: ['oidc'],
+  },
+  {
+    name: t('configs.auth_providers.oidc_token_endpoint_auth_method'),
+    key: 'token_endpoint_auth_method',
+    applicableProviders: ['oidc'],
+  },
+  {
+    name: t('configs.auth_providers.oidc_allow_insecure_http'),
+    key: 'allow_insecure_http',
+    applicableProviders: ['oidc'],
+  },
+  {
     name: t('configs.auth_providers.client_id'),
     key: 'client_id',
-    applicableProviders: ['google', 'github', 'microsoft'],
+    applicableProviders: ['google', 'github', 'microsoft', 'oidc'],
   },
   {
     name: t('configs.auth_providers.client_secret'),
     key: 'client_secret',
-    applicableProviders: ['google', 'github', 'microsoft'],
+    applicableProviders: ['google', 'github', 'microsoft', 'oidc'],
   },
   {
     name: t('configs.auth_providers.callback_url'),
     key: 'callback_url',
-    applicableProviders: ['google', 'github', 'microsoft'],
+    applicableProviders: ['google', 'github', 'microsoft', 'oidc'],
   },
   {
     name: t('configs.auth_providers.scope'),
     key: 'scope',
-    applicableProviders: ['google', 'github', 'microsoft'],
+    applicableProviders: ['google', 'github', 'microsoft', 'oidc'],
   },
   {
     name: t('configs.auth_providers.tenant'),
@@ -156,6 +226,16 @@ const providerConfigFields = <ProviderFieldMetadata[]>[
 ];
 
 const maskState = reactive<Record<SsoAuthProviders, ProviderFields>>({
+  oidc: {
+    client_id: false,
+    client_secret: true,
+    callback_url: false,
+    scope: false,
+    issuer: false,
+    discovery_url: false,
+    token_endpoint_auth_method: false,
+    allow_insecure_http: false,
+  },
   google: {
     client_id: true,
     client_secret: true,
@@ -179,7 +259,7 @@ const maskState = reactive<Record<SsoAuthProviders, ProviderFields>>({
 
 const toggleMask = (
   provider: SsoAuthProviders,
-  fieldKey: ProviderFieldKeys
+  fieldKey: ProviderFieldKeys,
 ) => {
   maskState[provider][fieldKey] = !maskState[provider][fieldKey];
 };

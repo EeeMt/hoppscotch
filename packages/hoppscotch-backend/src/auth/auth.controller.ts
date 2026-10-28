@@ -7,8 +7,11 @@ import {
   Request,
   Res,
   UseGuards,
+  UseFilters,
   UseInterceptors,
 } from '@nestjs/common';
+import { OIDCAuthService } from './oidc/oidc-auth.service';
+import { OIDCExceptionFilter } from './oidc/oidc-exception.filter';
 import { AuthService } from './auth.service';
 import { SignInMagicDto } from './dto/signin-magic.dto';
 import { VerifyMagicDto } from './dto/verify-magic.dto';
@@ -37,7 +40,20 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
+    private oidcAuth: OIDCAuthService,
   ) {}
+
+  @Get('oidc')
+  @UseFilters(OIDCExceptionFilter)
+  async oidcBegin(@Request() req, @Res() res: Response) {
+    return this.oidcAuth.begin(req, res);
+  }
+
+  @Get('oidc/callback')
+  @UseFilters(OIDCExceptionFilter)
+  async oidcCallback(@Request() req, @Res() res: Response) {
+    return this.oidcAuth.callback(req, res);
+  }
 
   @Get('providers')
   async getAuthProviders() {

@@ -129,6 +129,7 @@ async function getInitialUserDetails(): Promise<
            uid
            displayName
            email
+           emailVerified
            photoURL
            isAdmin
            createdOn
@@ -152,7 +153,7 @@ async function getInitialUserDetails(): Promise<
             ...res.value.data.me,
             refreshToken,
             accessToken,
-            emailVerified: true,
+            emailVerified: res.value.data.me.emailVerified,
           },
         },
       }
@@ -267,7 +268,7 @@ export async function setInitialUser() {
       displayName: hoppBackendUser.displayName,
       email: hoppBackendUser.email,
       photoURL: hoppBackendUser.photoURL,
-      emailVerified: true,
+      emailVerified: hoppBackendUser.emailVerified,
       accessToken,
     }
 
@@ -367,6 +368,7 @@ async function setAuthCookies(headers: Headers) {
 }
 
 export const def: AuthPlatformDef = {
+  supportsEmailVerification: false,
   customLoginSelectorUI: Login,
   getCurrentUserStream: () => currentUser$,
   getAuthEventsStream: () => authEvents$,

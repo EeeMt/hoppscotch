@@ -57,7 +57,18 @@
         "session_cookie_name_invalid": "Invalid cookie name. Only letters, numbers, underscore, and hyphen allowed.",
         "update_failure": "Failed to update token configurations!!"
       },
-      "update_failure": "Failed to update authentication provider configurations!!"
+      "update_failure": "Failed to update authentication provider configurations!!",
+      "oidc_restart": "Changes take effect after the backend restarts.",
+      "oidc_issuer": "OIDC Issuer",
+      "oidc_discovery_url": "Discovery URL (optional)",
+      "oidc_token_endpoint_auth_method": "Token Endpoint Authentication",
+      "oidc_allow_insecure_http": "Allow Insecure HTTP",
+      "oidc_basic": "Client secret in Authorization header (basic)",
+      "oidc_post": "Client secret in request body (post)",
+      "oidc_https_only": "Require HTTPS (default)",
+      "oidc_http_allowed": "Allow HTTP (insecure)",
+      "oidc_http_help": "HTTPS is required by default. Allow HTTP only for an internal identity provider configured to use HTTP.",
+      "oidc_auth_method_help": "Match the authentication method configured for this client in your identity provider."
     },
     "confirm_changes": "Hoppscotch server must restart to reflect the new changes. Confirm changes made to the server configurations?",
     "invalid_number": "Please enter a valid number for the field",
@@ -224,7 +235,7 @@
     "configurations_title": "Server Configurations",
     "configuration_summary": "Configuration Summary",
     "oauth": {
-      "description": "Set up OAuth providers like Google, GitHub, Microsoft, etc.",
+      "description": "Set up OAuth providers like Google, GitHub, Microsoft, etc. / OpenID Connect",
       "description_accordian": "Select the OAuth providers you want to enable and provide the necessary configurations.",
       "title": "OAuth"
     },
@@ -383,7 +394,9 @@
     "user_already_invited": "Failed to send invite. User is already invited!!",
     "user_not_found": "User not found in the infra!!",
     "users_to_admin_success": "Selected users are elevated to admin status!!",
-    "users_to_admin_failure": "Failed to elevate selected users to admin status!!"
+    "users_to_admin_failure": "Failed to elevate selected users to admin status!!",
+    "continue_oidc": "Continue with OpenID Connect",
+    "oidc_failure": "Unable to sign in. Please try again."
   },
   "support": {
     "description": "Get help from the Hoppscotch community",

@@ -1,0 +1,53 @@
+# Isolated acceptance deployment. Prepare .local/aio.env and aio-postgres.env
+# with independent random credentials before use. Never point at a business DB.
+services:
+  db:
+    image: postgres:16-alpine@sha256:e013e867e712fec275706a6c51c966f0bb0c93cfa8f51000f85a15f9865a28cb
+    pull_policy: never
+    env_file: [../.local/aio-postgres.env]
+    networks:
+      isolated:
+        aliases: [oidc-db]
+    volumes: [oidc-db:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U oidc_test -d oidc_aio']
+      interval: 2s
+      retries: 30
+  aio:
+    image: ${OIDC_AIO_IMAGE:-hoppscotch-oidc:validation}
+    pull_policy: never
+    restart: unless-stopped
+    env_file: [../.local/aio.env]
+    networks:
+      isolated:
+        aliases: [hoppscotch-oidc-aio]
+    depends_on:
+      db:
+        condition: service_healthy
+  idp-relay:
+    image: node:24-bookworm@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0
+    pull_policy: never
+    command: [node, /relay.mjs]
+    environment:
+      OIDC_RELAY_ADDRESS: ${OIDC_RELAY_ADDRESS:?Set the explicitly resolved authentik IP}
+    volumes: [../support/idp-relay.mjs:/relay.mjs:ro]
+    networks:
+      outgoing: {}
+      isolated:
+        aliases: [auth.ihxq.fun]
+  ingress:
+    image: node:24-bookworm@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0
+    pull_policy: never
+    command: [node, /ingress.mjs]
+    volumes: [../support/aio-ingress.mjs:/ingress.mjs:ro]
+    ports:
+      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:3100:3100'
+      - '127.0.0.1:3170:3170'
+    networks: [outgoing, isolated]
+networks:
+  isolated:
+    internal: true
+  outgoing: {}
+volumes:
+  oidc-db: {}

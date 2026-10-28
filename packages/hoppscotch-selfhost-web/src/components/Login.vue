@@ -82,10 +82,8 @@ onMounted(async () => {
 
   await listen<string>("hopp_auth://token", async (data) => {
     authFlowState.value = { type: "loading" }
-    console.info("hopp_auth://token data", data)
     try {
       const parseResult = DeviceTokenResponse.safeParse(data.payload)
-      console.info("parseResult", parseResult)
 
       if (!parseResult.success) {
         throw new Error("Token data returned from backend was invalid")

@@ -24,6 +24,12 @@
         class="flex flex-col space-y-2"
       >
         <HoppSmartItem
+          v-if="allowedAuthProviders.includes('OIDC')"
+          :icon="IconKeyRound"
+          :label="t('state.continue_oidc')"
+          @click="signInWithOIDC"
+        />
+        <HoppSmartItem
           v-if="allowedAuthProviders.includes('GITHUB')"
           :loading="signingInWithGitHub"
           :icon="IconGithub"
@@ -169,6 +175,7 @@ import { useI18n } from '~/composables/i18n';
 import { useToast } from '~/composables/toast';
 import { auth } from '~/helpers/auth';
 import { setLocalConfig } from '~/helpers/localpersistence';
+import IconKeyRound from '~icons/lucide/key-round';
 import IconEmail from '~icons/auth/email';
 import IconGithub from '~icons/auth/github';
 import IconGoogle from '~icons/auth/google';
@@ -212,6 +219,14 @@ onMounted(async () => {
   }
   allowedAuthProviders.value = await getAllowedAuthProviders();
 });
+
+const signInWithOIDC = () => {
+  try {
+    auth.signInUserWithOIDC();
+  } catch {
+    toast.error(t('state.oidc_failure'));
+  }
+};
 
 const signInWithGoogle = () => {
   signingInWithGoogle.value = true;

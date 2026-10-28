@@ -86,7 +86,8 @@ async function bootstrap() {
     app.set('trust proxy', true);
   }
 
-  app.use(morgan(':remote-addr :method :url :status - :response-time ms'));
+  morgan.token('safe-url', req => req.url?.split('?')[0]);
+  app.use(morgan(':remote-addr :method :safe-url :status - :response-time ms'));
 
   await setupSwagger(app, isProduction);
 

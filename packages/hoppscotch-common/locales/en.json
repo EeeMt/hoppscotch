@@ -202,7 +202,9 @@
     "send_magic_link": "Send a magic link",
     "sync": "Sync",
     "we_sent_magic_link": "We sent you a magic link!",
-    "we_sent_magic_link_description": "Check your inbox - we sent an email to {email}. It contains a magic link that will log you in."
+    "we_sent_magic_link_description": "Check your inbox - we sent an email to {email}. It contains a magic link that will log you in.",
+    "continue_oidc": "Continue with OpenID Connect",
+    "oidc_failure": "Unable to sign in. Please try again."
   },
   "authorization": {
     "generate_token": "Generate Token",

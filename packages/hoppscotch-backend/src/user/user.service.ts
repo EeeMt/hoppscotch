@@ -18,7 +18,7 @@ import { SessionType, User } from './user.model';
 import { PubSubService } from 'src/pubsub/pubsub.service';
 import { encrypt, stringToJson, taskEitherValidateArraySeq } from 'src/utils';
 import { UserDataHandler } from './user.data.handler';
-import { User as DbUser } from 'src/generated/prisma/client';
+import { Prisma, User as DbUser } from 'src/generated/prisma/client';
 import { OffsetPaginationArgs } from 'src/types/input-types.args';
 import { GetUserWorkspacesResponse } from 'src/infra-token/request-response.dto';
 import { TeamAccessRole } from 'src/team/team.model';
@@ -63,8 +63,11 @@ export class UserService {
    * @param email User's email
    * @returns Option of found User
    */
-  async findUserByEmail(email: string): Promise<O.None | O.Some<AuthUser>> {
-    const user = await this.prisma.user.findFirst({
+  async findUserByEmail(
+    email: string,
+    db: Prisma.TransactionClient = this.prisma,
+  ): Promise<O.None | O.Some<AuthUser>> {
+    const user = await db.user.findFirst({
       where: {
         email: {
           equals: email,
@@ -139,8 +142,11 @@ export class UserService {
    * @param email User's Email
    * @returns Created User
    */
-  async createUserViaMagicLink(email: string) {
-    const createdUser = await this.prisma.user.create({
+  async createUserViaMagicLink(
+    email: string,
+    db: Prisma.TransactionClient = this.prisma,
+  ) {
+    const createdUser = await db.user.create({
       data: {
         email: email,
         providerAccounts: {
@@ -167,14 +173,16 @@ export class UserService {
     accessTokenSSO: string,
     refreshTokenSSO: string,
     profile,
+    db: Prisma.TransactionClient = this.prisma,
   ) {
     const userDisplayName = !profile.displayName ? null : profile.displayName;
     const userPhotoURL = !profile.photos ? null : profile.photos[0].value;
 
-    const createdUser = await this.prisma.user.create({
+    const createdUser = await db.user.create({
       data: {
         displayName: userDisplayName,
         email: profile.emails[0].value,
+        emailVerified: true,
         photoURL: userPhotoURL,
         lastLoggedOn: new Date(),
         providerAccounts: {
@@ -205,8 +213,9 @@ export class UserService {
     accessToken: string,
     refreshToken: string,
     profile,
+    db: Prisma.TransactionClient = this.prisma,
   ) {
-    const createdProvider = await this.prisma.account.create({
+    const createdProvider = await db.account.create({
       data: {
         provider: profile.provider,
         providerAccountId: profile.id,
@@ -230,13 +239,18 @@ export class UserService {
    * @param profile Data received from SSO provider on the users account
    * @returns Updated user object
    */
-  async updateUserDetails(user: AuthUser, profile) {
+  async updateUserDetails(
+    user: AuthUser,
+    profile,
+    db: Prisma.TransactionClient = this.prisma,
+  ) {
     try {
-      const updatedUser = await this.prisma.user.update({
+      const updatedUser = await db.user.update({
         where: {
           uid: user.uid,
         },
         data: {
+          emailVerified: true,
           displayName: !profile.displayName ? null : profile.displayName,
           photoURL: !profile.photos ? null : profile.photos[0].value,
           lastLoggedOn: new Date(),
@@ -549,6 +563,7 @@ export class UserService {
             uid: user.uid,
             displayName: user.displayName,
             email: user.email,
+            emailVerified: user.emailVerified,
             photoURL: user.photoURL,
             isAdmin: user.isAdmin,
             createdOn: user.createdOn,

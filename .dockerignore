@@ -33,3 +33,8 @@ CODEOWNERS
 
 .DS_Store
 *.log
+**/.env*
+!**/.env.example
+**/test/oidc/.local/
+.aws/
+.codex/

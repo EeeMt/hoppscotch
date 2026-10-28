@@ -1,3 +1,4 @@
+import { readOIDCConfiguration } from 'src/auth/oidc/oidc-config';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InfraConfig } from './infra-config.model';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -65,6 +66,7 @@ export class InfraConfigService implements OnModuleInit, OnModuleDestroy {
     InfraConfigEnum.IS_FIRST_TIME_INFRA_SETUP,
     InfraConfigEnum.MAILER_SMTP_ENABLE,
     InfraConfigEnum.USER_HISTORY_STORE_ENABLED,
+    InfraConfigEnum.OIDC_CALLBACK_URL,
   ];
   // Following fields can not be fetched by `infraConfigs` Query. Use dedicated queries for these fields instead.
   EXCLUDE_FROM_FETCH_CONFIGS = [
@@ -219,6 +221,26 @@ export class InfraConfigService implements OnModuleInit, OnModuleDestroy {
    * @returns InfraConfig model
    */
   async update(name: InfraConfigEnum, value: string, restartEnabled = false) {
+    if (name.startsWith('OIDC_')) {
+      if (name === InfraConfigEnum.OIDC_CALLBACK_URL)
+        return E.left(INFRA_CONFIG_OPERATION_NOT_ALLOWED);
+      const effective: Record<string, string> = {
+        ...(await this.getInfraConfigsMap()),
+        [name]: value,
+        VITE_BACKEND_API_URL:
+          this.configService.get<string>('VITE_BACKEND_API_URL') ||
+          process.env.VITE_BACKEND_API_URL,
+      };
+      try {
+        readOIDCConfiguration(
+          effective,
+          effective.VITE_ALLOWED_AUTH_PROVIDERS?.split(',').includes('OIDC') ===
+            true,
+        );
+      } catch {
+        return E.left(INFRA_CONFIG_INVALID_INPUT);
+      }
+    }
     const isValidate = this.validateEnvValues([{ name, value }]);
     if (E.isLeft(isValidate)) return E.left(isValidate.left);
 
@@ -258,6 +280,31 @@ export class InfraConfigService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
+    if (
+      infraConfigs.some(
+        (c) =>
+          c.name.startsWith('OIDC_') ||
+          c.name === InfraConfigEnum.VITE_ALLOWED_AUTH_PROVIDERS,
+      )
+    ) {
+      const current = await this.getInfraConfigsMap();
+      const effective: Record<string, string> = {
+        ...current,
+        ...Object.fromEntries(infraConfigs.map((c) => [c.name, c.value])),
+        VITE_BACKEND_API_URL:
+          this.configService.get<string>('VITE_BACKEND_API_URL') ||
+          process.env.VITE_BACKEND_API_URL,
+      };
+      try {
+        readOIDCConfiguration(
+          effective,
+          effective.VITE_ALLOWED_AUTH_PROVIDERS?.split(',').includes('OIDC') ===
+            true,
+        );
+      } catch {
+        return E.left(INFRA_CONFIG_INVALID_INPUT);
+      }
+    }
     const isValidate = this.validateEnvValues(infraConfigs);
     if (E.isLeft(isValidate)) return E.left(isValidate.left);
 
@@ -306,6 +353,18 @@ export class InfraConfigService implements OnModuleInit, OnModuleDestroy {
     configMap: Record<string, string>,
   ) {
     switch (service) {
+      case AuthProvider.OIDC:
+        try {
+          readOIDCConfiguration({
+            ...configMap,
+            VITE_BACKEND_API_URL:
+              this.configService.get('VITE_BACKEND_API_URL') ||
+              process.env.VITE_BACKEND_API_URL,
+          });
+          return true;
+        } catch {
+          return false;
+        }
       case AuthProvider.GOOGLE:
         return (
           configMap.GOOGLE_CLIENT_ID &&
@@ -501,10 +560,17 @@ export class InfraConfigService implements OnModuleInit, OnModuleDestroy {
    * @returns string[]
    */
   getAllowedAuthProviders() {
-    return (
+    const providers =
       this.configService
         .get<string>('INFRA.VITE_ALLOWED_AUTH_PROVIDERS')
-        ?.split(',') ?? []
+        ?.split(',') ?? [];
+    return providers.filter(
+      (provider) =>
+        provider !== 'OIDC' ||
+        this.isServiceConfigured(
+          AuthProvider.OIDC,
+          this.configService.get('INFRA') ?? {},
+        ),
     );
   }
 
@@ -748,8 +814,19 @@ export class InfraConfigService implements OnModuleInit, OnModuleDestroy {
       value: string;
     }[],
   ) {
+    const mailerDisabled = infraConfigs.some(
+      (c) =>
+        c.name === InfraConfigEnum.MAILER_SMTP_ENABLE && c.value === 'false',
+    );
     for (const config of infraConfigs) {
       const { name, value } = config;
+      if (
+        mailerDisabled &&
+        name.startsWith('MAILER_') &&
+        name !== InfraConfigEnum.MAILER_SMTP_ENABLE &&
+        !value
+      )
+        continue;
 
       const fail = () => {
         console.error(`[Infra Validation Failed] Key: ${name}`);

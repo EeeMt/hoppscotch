@@ -6,7 +6,7 @@ import { InfraConfigEnum } from '~/helpers/backend/graphql';
 import { getLocalConfig, setLocalConfig } from '~/helpers/localpersistence';
 import { makeReadableKey } from '~/helpers/utils/readableKey';
 
-export type OAuthProvider = 'GOOGLE' | 'GITHUB' | 'MICROSOFT';
+export type OAuthProvider = 'GOOGLE' | 'GITHUB' | 'MICROSOFT' | 'OIDC';
 export type EnabledConfig = OAuthProvider | 'OAUTH' | 'MAILER' | 'EMAIL';
 
 // common OAuth keys used across providers
@@ -43,6 +43,14 @@ export type Configs = {
   oAuthProviders: {
     GOOGLE: OAuthConfig<OAuthKeys, 'GOOGLE'>;
     GITHUB: OAuthConfig<OAuthKeys, 'GITHUB'>;
+    OIDC: OAuthConfig<
+      | OAuthKeys
+      | 'ISSUER'
+      | 'DISCOVERY_URL'
+      | 'TOKEN_ENDPOINT_AUTH_METHOD'
+      | 'ALLOW_INSECURE_HTTP',
+      'OIDC'
+    >;
     MICROSOFT: OAuthConfig<MicrosoftKeys, 'MICROSOFT'>;
   };
   mailerConfigs: {
@@ -61,6 +69,17 @@ function mapOAuthProviders(
   configs: Partial<Record<InfraConfigEnum, string>>,
 ): Configs['oAuthProviders'] {
   return {
+    OIDC: {
+      OIDC_ISSUER: configs.OIDC_ISSUER ?? '',
+      OIDC_DISCOVERY_URL: configs.OIDC_DISCOVERY_URL ?? '',
+      OIDC_CLIENT_ID: configs.OIDC_CLIENT_ID ?? '',
+      OIDC_CLIENT_SECRET: configs.OIDC_CLIENT_SECRET ?? '',
+      OIDC_CALLBACK_URL: `${import.meta.env.VITE_BACKEND_API_URL?.replace(/\/+$/, '')}/auth/oidc/callback`,
+      OIDC_SCOPE: configs.OIDC_SCOPE || 'openid,profile,email',
+      OIDC_TOKEN_ENDPOINT_AUTH_METHOD:
+        configs.OIDC_TOKEN_ENDPOINT_AUTH_METHOD || 'client_secret_basic',
+      OIDC_ALLOW_INSECURE_HTTP: configs.OIDC_ALLOW_INSECURE_HTTP || 'false',
+    },
     GOOGLE: {
       GOOGLE_CLIENT_ID: configs.GOOGLE_CLIENT_ID ?? '',
       GOOGLE_CLIENT_SECRET: configs.GOOGLE_CLIENT_SECRET ?? '',
@@ -146,7 +165,7 @@ export function useOnboardingConfigHandler() {
   const toggleConfig = (key: EnabledConfig | 'OAUTH' | 'EMAIL') => {
     if (key === 'OAUTH') {
       enabledConfigs.value = enabledConfigs.value.filter(
-        (c) => !['GOOGLE', 'GITHUB', 'MICROSOFT'].includes(c),
+        (c) => !['GOOGLE', 'GITHUB', 'MICROSOFT', 'OIDC'].includes(c),
       );
     }
 
@@ -177,8 +196,9 @@ export function useOnboardingConfigHandler() {
 
   // Set callback URLs for OAuth providers based on the current backend API URL
   const setCallbackUrls = () => {
-    const base = import.meta.env.VITE_BACKEND_API_URL;
+    const base = import.meta.env.VITE_BACKEND_API_URL?.replace(/\/+$/, '');
     const oAuth = currentConfigs.value.oAuthProviders;
+    oAuth.OIDC.OIDC_CALLBACK_URL = `${base}/auth/oidc/callback`;
 
     if (oAuth.GOOGLE.GOOGLE_CLIENT_ID) {
       oAuth.GOOGLE.GOOGLE_CALLBACK_URL = `${base}/auth/google/callback`;
@@ -281,6 +301,7 @@ export function useOnboardingConfigHandler() {
     // included in the returned payload even when empty so the backend can
     // explicitly clear previously stored credentials on re-visits.
     const optionalSmtpKeys = new Set([
+      'OIDC_DISCOVERY_URL',
       'MAILER_SMTP_USER',
       'MAILER_SMTP_PASSWORD',
       'MAILER_SMTP_OAUTH2_USER',
@@ -344,6 +365,7 @@ export function useOnboardingConfigHandler() {
   const addOnBoardingConfigs = async () => {
     submittingConfigs.value = true;
     const payload = {
+      ...currentConfigs.value.oAuthProviders.OIDC,
       ...currentConfigs.value.oAuthProviders.GOOGLE,
       ...currentConfigs.value.oAuthProviders.GITHUB,
       ...currentConfigs.value.oAuthProviders.MICROSOFT,
@@ -364,6 +386,9 @@ export function useOnboardingConfigHandler() {
 
     const configWithAuth = {
       ...validated,
+      MAILER_SMTP_ENABLE: enabledConfigs.value.includes('MAILER')
+        ? currentConfigs.value.mailerConfigs.MAILER_SMTP_ENABLE
+        : 'false',
       [InfraConfigEnum.ViteAllowedAuthProviders]:
         filteredEnabledConfigs.join(','),
     };
@@ -377,7 +402,8 @@ export function useOnboardingConfigHandler() {
         return res;
       }
     } catch (err) {
-      console.error('Failed to add onboarding configs', err);
+      // Axios errors retain the request body, including provider and SMTP secrets.
+      console.error('Failed to add onboarding configs');
       toast.error(t('onboarding.configurations_adding_failed'));
       onBoardingSummary.value = makeOnboardingSummary(err as Error);
     } finally {
@@ -403,7 +429,7 @@ export function useOnboardingConfigHandler() {
         // cause provider-name mismatches in downstream `.includes()` checks.
         const parsed = allowed
           .split(',')
-          .map((p) => p.trim())
+          .map((p: string) => p.trim())
           .filter(Boolean) as EnabledConfig[];
 
         // The backend persists only 'EMAIL' in VITE_ALLOWED_AUTH_PROVIDERS,

@@ -1,0 +1,18 @@
+# Isolated test entry only. Supply a pinned proxy image/digest in ../.local/tls.env.
+# docker compose --env-file ../.local/tls.env -f authentik-tls.compose.yml up -d --pull never
+services:
+  oidc-test-proxy:
+    image: ${OIDC_TLS_PROXY_IMAGE:?Set an available pinned Caddy image or digest}
+    pull_policy: never
+    env_file: ../.local/tls.env
+    ports:
+      - '${OIDC_TLS_BIND:?Set the isolated test bind address}:443'
+      - '${OIDC_HTTP_BIND:?Set the isolated HTTP test bind address}:80'
+    volumes:
+      - ./authentik-tls.Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../.local/server.pem:/run/oidc/server.pem:ro
+      - ../.local/server-key.pem:/run/oidc/server-key.pem:ro
+    read_only: true
+    tmpfs:
+      - /data
+      - /config

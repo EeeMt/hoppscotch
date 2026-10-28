@@ -1,3 +1,8 @@
+import { OIDCAuthService } from './oidc/oidc-auth.service';
+import { OIDCExceptionFilter } from './oidc/oidc-exception.filter';
+import { OIDCClientAdapter } from './oidc/oidc-client.adapter';
+import { OIDCTransactionService } from './oidc/oidc-transaction.service';
+import { OIDCIdentityService } from './oidc/oidc-identity.service';
 import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
@@ -29,7 +34,14 @@ import { InfraConfigModule } from 'src/infra-config/infra-config.module';
     }),
     InfraConfigModule,
   ],
-  providers: [AuthService],
+  providers: [
+    AuthService,
+    OIDCAuthService,
+    OIDCExceptionFilter,
+    OIDCClientAdapter,
+    OIDCTransactionService,
+    OIDCIdentityService,
+  ],
   controllers: [AuthController],
 })
 export class AuthModule {

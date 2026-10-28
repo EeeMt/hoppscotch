@@ -1,3 +1,4 @@
+import { consumeOIDCLoginReturn } from "@hoppscotch/common/helpers/oidc-login-return"
 import { nextTick, ref, watch } from "vue"
 import { emit, listen } from "@tauri-apps/api/event"
 import { createHoppApp } from "@hoppscotch/common"
@@ -133,6 +134,23 @@ function isTextInput(target: EventTarget | null): boolean {
 async function initApp() {
   const platform = getKernelMode()
   const config = PLATFORM_CONFIG[platform]
+  if (platform === "web") {
+    const base = new URL(import.meta.env.VITE_BASE_URL)
+    if (
+      window.location.origin === base.origin &&
+      window.location.pathname.replace(/\/+$/, "") ===
+        base.pathname.replace(/\/+$/, "")
+    ) {
+      const target = consumeOIDCLoginReturn(
+        sessionStorage,
+        import.meta.env.VITE_BASE_URL
+      )
+      if (target) {
+        window.location.replace(target)
+        return
+      }
+    }
+  }
 
   if (platform === "desktop") {
     setupDesktopUI()

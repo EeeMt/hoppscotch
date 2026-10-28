@@ -22,6 +22,9 @@ import { ConfigService } from '@nestjs/config';
 import { InfraConfigService } from 'src/infra-config/infra-config.service';
 
 const mockPrisma = mockDeep<PrismaService>();
+mockPrisma.$transaction.mockImplementation(async (operation: any) =>
+  operation(mockPrisma),
+);
 const mockUser = mockDeep<UserService>();
 const mockJWT = mockDeep<JwtService>();
 const mockMailer = mockDeep<MailerService>();
@@ -43,6 +46,7 @@ const currentTime = new Date();
 
 const user: AuthUser = {
   uid: '123344',
+  emailVerified: false,
   email: 'dwight@dundermifflin.com',
   displayName: 'Dwight Schrute',
   photoURL: 'https://en.wikipedia.org/wiki/Dwight_Schrute',

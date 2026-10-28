@@ -223,7 +223,11 @@ EXPOSE 3170
 
 FROM base_builder AS fe_builder
 WORKDIR /usr/src/app/packages/hoppscotch-selfhost-web
-RUN pnpm run generate
+# The sitemap needs a build-time base even when real .env files are excluded.
+# Runtime frontend configuration continues to use the existing VITE_ injection.
+ARG VITE_BASE_URL=http://localhost:3000
+ARG HOPP_BUILD_NODE_HEAP_MB=8192
+RUN VITE_BASE_URL="${VITE_BASE_URL}" node --max-old-space-size="${HOPP_BUILD_NODE_HEAP_MB}" ./node_modules/vite/bin/vite.js build
 # Group-writable (GID 0) so a non-root UID (OpenShift runs as GID 0) can rewrite
 # these files during env injection. Done here (not in the runtime stage) so the
 # perms travel with the COPY instead of duplicating the layer with a chmod there.

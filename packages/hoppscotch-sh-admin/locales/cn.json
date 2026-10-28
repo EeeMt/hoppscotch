@@ -1,3 +1,21 @@
 {
-
+  "state": {
+    "continue_oidc": "使用 OpenID Connect 登录",
+    "oidc_failure": "登录失败，请重试。"
+  },
+  "configs": {
+    "auth_providers": {
+      "oidc_restart": "后端重启后配置生效。",
+      "oidc_issuer": "OIDC 颁发者",
+      "oidc_discovery_url": "发现文档 URL（可选）",
+      "oidc_token_endpoint_auth_method": "Token 端点认证方式",
+      "oidc_allow_insecure_http": "允许不安全的 HTTP",
+      "oidc_basic": "通过 Authorization 请求头发送密钥（basic）",
+      "oidc_post": "通过请求体发送密钥（post）",
+      "oidc_https_only": "要求 HTTPS（默认）",
+      "oidc_http_allowed": "允许 HTTP（不安全）",
+      "oidc_http_help": "默认要求 HTTPS。仅在内网身份服务使用 HTTP 时开启。",
+      "oidc_auth_method_help": "请选择身份服务为此客户端配置的认证方式。"
+    }
+  }
 }

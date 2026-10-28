@@ -16,6 +16,7 @@ import { PubSubService } from 'src/pubsub/pubsub.service';
 import { ServiceStatus } from './helper';
 import * as E from 'fp-ts/Either';
 import { UserService } from 'src/user/user.service';
+import { readOIDCConfiguration } from '../auth/oidc/oidc-config';
 
 const mockPrisma = mockDeep<PrismaService>();
 const mockConfigService = mockDeep<ConfigService>();
@@ -564,5 +565,63 @@ describe('InfraConfigService', () => {
 
       expect(result).toEqualLeft(INFRA_CONFIG_NOT_FOUND);
     });
+  });
+});
+
+describe('OIDC configuration contract', () => {
+  const base = {
+    VITE_ALLOWED_AUTH_PROVIDERS: 'OIDC',
+    OIDC_ISSUER: 'https://sso.internal/application/o/hopp/',
+    OIDC_CLIENT_ID: 'client',
+    OIDC_CLIENT_SECRET: 'secret',
+    VITE_BACKEND_API_URL: 'https://app.internal/backend/v1/',
+    MAILER_SMTP_ENABLE: 'false',
+  };
+  it('allows OIDC alone without SMTP and derives a callback preserving subpaths', () => {
+    const value = readOIDCConfiguration(base);
+    expect(value.issuer).toBe(base.OIDC_ISSUER);
+    expect(value.callbackUrl).toBe(
+      'https://app.internal/backend/v1/auth/oidc/callback',
+    );
+    expect(value.scope).toBe('openid profile email');
+    expect(value.authMethod).toBe('client_secret_basic');
+    expect(value.allowInsecureHttp).toBe(false);
+  });
+  it('keeps defaults when transformed DTO properties are present but undefined', () => {
+    const expected = readOIDCConfiguration(base);
+    expect(
+      readOIDCConfiguration({
+        ...base,
+        OIDC_SCOPE: undefined,
+        OIDC_TOKEN_ENDPOINT_AUTH_METHOD: undefined,
+        OIDC_ALLOW_INSECURE_HTTP: undefined,
+      }),
+    ).toEqual(expected);
+  });
+  it.each([
+    { OIDC_SCOPE: 'email,profile' },
+    { OIDC_TOKEN_ENDPOINT_AUTH_METHOD: 'none' },
+    { OIDC_ALLOW_INSECURE_HTTP: 'TRUE' },
+    { OIDC_ISSUER: 'http://sso.internal/' },
+    { OIDC_ISSUER: 'https://sso.internal/?x=1' },
+    { OIDC_DISCOVERY_URL: 'https://user:password@sso.internal/discovery' },
+    { OIDC_CLIENT_SECRET: '' },
+  ])('rejects invalid complete configuration %p', (change) => {
+    expect(() => readOIDCConfiguration({ ...base, ...change })).toThrow();
+  });
+  it('allows HTTP only when explicitly true and normalizes scope duplicates', () => {
+    const value = readOIDCConfiguration({
+      ...base,
+      OIDC_ISSUER: 'http://sso.internal/',
+      OIDC_ALLOW_INSECURE_HTTP: 'true',
+      OIDC_SCOPE: ' openid,openid, profile ',
+    });
+    expect(value.scope).toBe('openid profile');
+  });
+  it('fingerprints changes to confidential client configuration', () => {
+    expect(readOIDCConfiguration(base).fingerprint).not.toBe(
+      readOIDCConfiguration({ ...base, OIDC_CLIENT_SECRET: 'changed' })
+        .fingerprint,
+    );
   });
 });

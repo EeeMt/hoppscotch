@@ -202,7 +202,9 @@
     "send_magic_link": "发送魔术链接",
     "sync": "同步",
     "we_sent_magic_link": "已发送魔术链接！",
-    "we_sent_magic_link_description": "请检查您的收件箱 - 我们向 {email} 发送了一封邮件，其中包含了能够让您登录的魔术链接。"
+    "we_sent_magic_link_description": "请检查您的收件箱 - 我们向 {email} 发送了一封邮件，其中包含了能够让您登录的魔术链接。",
+    "continue_oidc": "使用 OpenID Connect 登录",
+    "oidc_failure": "登录失败，请重试。"
   },
   "authorization": {
     "generate_token": "生成令牌",

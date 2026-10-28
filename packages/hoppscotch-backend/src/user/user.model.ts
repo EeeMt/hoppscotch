@@ -19,6 +19,11 @@ export class User {
   })
   email?: string;
 
+  @Field(() => Boolean, {
+    description: 'Email verification status supplied by the identity source',
+  })
+  emailVerified: boolean;
+
   @Field({
     nullable: true,
     description: 'URL to the profile photo of the user (if fetched)',

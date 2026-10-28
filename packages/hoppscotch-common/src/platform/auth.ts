@@ -60,6 +60,7 @@ export type LoginItemDef = {
 }
 
 export type AuthPlatformDef = {
+  supportsEmailVerification?: boolean
   /**
    * Whether this platform shows a custom login selector UI. Used for situations
    * where we don't want to render the traditional UI and want to replace it

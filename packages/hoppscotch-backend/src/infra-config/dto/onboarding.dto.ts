@@ -13,6 +13,39 @@ export class GetOnboardingStatusResponse {
 }
 
 export class SaveOnboardingConfigRequest {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  [InfraConfigEnum.OIDC_ISSUER]: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  [InfraConfigEnum.OIDC_DISCOVERY_URL]: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  [InfraConfigEnum.OIDC_CLIENT_ID]: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  [InfraConfigEnum.OIDC_CLIENT_SECRET]: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  [InfraConfigEnum.OIDC_CALLBACK_URL]: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  [InfraConfigEnum.OIDC_SCOPE]: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  [InfraConfigEnum.OIDC_TOKEN_ENDPOINT_AUTH_METHOD]: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  [InfraConfigEnum.OIDC_ALLOW_INSECURE_HTTP]: string;
+
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
@@ -149,6 +182,31 @@ export class SaveOnboardingConfigResponse {
 }
 
 export class GetOnboardingConfigResponse {
+  @ApiProperty()
+  @Expose()
+  [InfraConfigEnum.OIDC_ISSUER]: string;
+  @ApiProperty()
+  @Expose()
+  [InfraConfigEnum.OIDC_DISCOVERY_URL]: string;
+  @ApiProperty()
+  @Expose()
+  [InfraConfigEnum.OIDC_CLIENT_ID]: string;
+  @ApiProperty()
+  @Expose()
+  [InfraConfigEnum.OIDC_CLIENT_SECRET]: string;
+  @ApiProperty()
+  @Expose()
+  [InfraConfigEnum.OIDC_CALLBACK_URL]: string;
+  @ApiProperty()
+  @Expose()
+  [InfraConfigEnum.OIDC_SCOPE]: string;
+  @ApiProperty()
+  @Expose()
+  [InfraConfigEnum.OIDC_TOKEN_ENDPOINT_AUTH_METHOD]: string;
+  @ApiProperty()
+  @Expose()
+  [InfraConfigEnum.OIDC_ALLOW_INSECURE_HTTP]: string;
+
   @ApiProperty()
   @Expose()
   [InfraConfigEnum.VITE_ALLOWED_AUTH_PROVIDERS]: string;

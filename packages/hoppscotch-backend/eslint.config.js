@@ -46,5 +46,12 @@ module.exports = defineConfig([
       '@typescript-eslint/no-empty-function': 'error',
     },
   },
-  globalIgnores(['**/.eslintrc.js']),
+  globalIgnores([
+    '**/.eslintrc.js',
+    '**/node_modules/**',
+    'dist/**',
+    'build/**',
+    'coverage/**',
+    '**/*.min.js',
+  ]),
 ]);

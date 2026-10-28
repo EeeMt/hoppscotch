@@ -1,3 +1,4 @@
+import { OIDC_DEFAULTS } from 'src/auth/oidc/oidc-config';
 import { AuthProvider } from 'src/auth/helper';
 import { ENV_INVALID_DATA_ENCRYPTION_KEY } from 'src/errors';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -50,6 +51,12 @@ export function getAuthProviderRequiredKeys(
   env: Record<string, any>,
 ): Record<AuthProvider, InfraConfigEnum[]> {
   return {
+    [AuthProvider.OIDC]: [
+      InfraConfigEnum.OIDC_ISSUER,
+      InfraConfigEnum.OIDC_CLIENT_ID,
+      InfraConfigEnum.OIDC_CLIENT_SECRET,
+      InfraConfigEnum.OIDC_CALLBACK_URL,
+    ],
     [AuthProvider.GOOGLE]: [
       InfraConfigEnum.GOOGLE_CLIENT_ID,
       InfraConfigEnum.GOOGLE_CLIENT_SECRET,
@@ -379,6 +386,21 @@ export async function getDefaultInfraConfigs(): Promise<DefaultInfraConfig[]> {
     },
   ];
 
+  for (const [name, fallback] of Object.entries(OIDC_DEFAULTS)) {
+    const raw = process.env[name] ?? fallback;
+    infraConfigDefaultObjs.push({
+      name: name as InfraConfigEnum,
+      value: name === 'OIDC_CLIENT_SECRET' ? encrypt(raw) : raw,
+      isEncrypted: name === 'OIDC_CLIENT_SECRET',
+    });
+  }
+  infraConfigDefaultObjs.push({
+    name: InfraConfigEnum.OIDC_CALLBACK_URL,
+    value: process.env.VITE_BACKEND_API_URL
+      ? `${process.env.VITE_BACKEND_API_URL.replace(/\/+$/, '')}/auth/oidc/callback`
+      : null,
+    isEncrypted: false,
+  });
   return infraConfigDefaultObjs;
 }
 
@@ -624,5 +646,10 @@ export async function buildDerivedEnv() {
     }
   }
 
+  if (backendUrl) {
+    const callback = `${normalizedBackendUrl}/auth/oidc/callback`;
+    if (envConfigMap.INFRA.OIDC_CALLBACK_URL !== callback)
+      derivedEnv.OIDC_CALLBACK_URL = callback;
+  }
   return derivedEnv;
 }

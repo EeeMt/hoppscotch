@@ -8,6 +8,7 @@ export default {
         uid
         displayName
         email
+        emailVerified
         photoURL
         isAdmin
         createdOn

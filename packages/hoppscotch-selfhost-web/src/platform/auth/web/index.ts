@@ -1,3 +1,5 @@
+import { saveOIDCLoginReturn } from "@hoppscotch/common/helpers/oidc-login-return"
+import IconKeyRound from "~icons/lucide/key-round"
 import * as E from "fp-ts/Either"
 import axios from "axios"
 import { BehaviorSubject, Subject } from "rxjs"
@@ -49,7 +51,7 @@ async function getInitialUserDetails() {
         photoURL: string
         isAdmin: boolean
         createdOn: string
-        // emailVerified: boolean
+        emailVerified: boolean
       }
     }
     errors?: Array<{
@@ -63,6 +65,7 @@ async function getInitialUserDetails() {
         uid
         displayName
         email
+        emailVerified
         photoURL
         isAdmin
         createdOn
@@ -132,8 +135,7 @@ async function setInitialUser() {
       displayName: hoppBackendUser.displayName,
       email: hoppBackendUser.email,
       photoURL: hoppBackendUser.photoURL,
-      // all our signin methods currently guarantees the email is verified
-      emailVerified: true,
+      emailVerified: hoppBackendUser.emailVerified,
     }
 
     await setUser(hoppUser)
@@ -196,6 +198,22 @@ async function sendMagicLink(email: string) {
 }
 
 export const def: AuthPlatformDef = {
+  supportsEmailVerification: false,
+  additionalLoginItems: [
+    {
+      id: "OIDC",
+      icon: IconKeyRound,
+      text: (t) => t("auth.continue_oidc"),
+      onClick: () => {
+        saveOIDCLoginReturn(
+          sessionStorage,
+          window.location.href,
+          import.meta.env.VITE_BASE_URL
+        )
+        window.location.href = `${import.meta.env.VITE_BACKEND_API_URL.replace(/\/+$/, "")}/auth/oidc`
+      },
+    },
+  ],
   getCurrentUserStream: () => currentUser$,
   getAuthEventsStream: () => authEvents$,
   getProbableUserStream: () => probableUser$,

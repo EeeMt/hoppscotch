@@ -1,10 +1,24 @@
 import { inject, provide, ref, type InjectionKey, type Ref } from 'vue';
 import { InfraConfigEnum } from './backend/graphql';
 
-export type SsoAuthProviders = 'google' | 'microsoft' | 'github';
+export type SsoAuthProviders = 'google' | 'microsoft' | 'github' | 'oidc';
 
 export type ServerConfigs = {
   providers: {
+    oidc: {
+      name: SsoAuthProviders;
+      enabled: boolean;
+      fields: {
+        client_id: string;
+        client_secret: string;
+        callback_url: string;
+        scope: string;
+        issuer: string;
+        discovery_url: string;
+        token_endpoint_auth_method: string;
+        allow_insecure_http: string;
+      };
+    };
     google: {
       name: SsoAuthProviders;
       enabled: boolean;
@@ -134,6 +148,31 @@ export type Config = {
   // like "0" or "1.5" stays valid (the backend stores these as opaque strings).
   secret?: boolean;
 };
+
+export const OIDC_OPTION_LABELS = {
+  client_secret_basic: 'configs.auth_providers.oidc_basic',
+  client_secret_post: 'configs.auth_providers.oidc_post',
+  false: 'configs.auth_providers.oidc_https_only',
+  true: 'configs.auth_providers.oidc_http_allowed',
+} as const;
+
+export const OIDC_CONFIGS: Config[] = [
+  { name: InfraConfigEnum.OidcIssuer, key: 'issuer' },
+  {
+    name: InfraConfigEnum.OidcDiscoveryUrl,
+    key: 'discovery_url',
+    optional: true,
+  },
+  { name: InfraConfigEnum.OidcClientId, key: 'client_id' },
+  { name: InfraConfigEnum.OidcClientSecret, key: 'client_secret' },
+  { name: InfraConfigEnum.OidcCallbackUrl, key: 'callback_url' },
+  { name: InfraConfigEnum.OidcScope, key: 'scope' },
+  {
+    name: InfraConfigEnum.OidcTokenEndpointAuthMethod,
+    key: 'token_endpoint_auth_method',
+  },
+  { name: InfraConfigEnum.OidcAllowInsecureHttp, key: 'allow_insecure_http' },
+];
 
 export const GOOGLE_CONFIGS: Config[] = [
   {
@@ -356,6 +395,7 @@ export const isValidSessionCookieName = (value: string): boolean =>
   SESSION_COOKIE_NAME_REGEX.test(value);
 
 export const ALL_CONFIGS = [
+  OIDC_CONFIGS,
   GOOGLE_CONFIGS,
   MICROSOFT_CONFIGS,
   GITHUB_CONFIGS,
@@ -371,13 +411,13 @@ export const ALL_CONFIGS = [
 
 // Token fields that are optional and excluded from mandatory validation.
 export const OPTIONAL_TOKEN_FIELD_KEYS = new Set(
-  TOKEN_VALIDATION_CONFIGS.filter((cfg) => cfg.optional).map((cfg) => cfg.key)
+  TOKEN_VALIDATION_CONFIGS.filter((cfg) => cfg.optional).map((cfg) => cfg.key),
 );
 
 // Token fields that are free-form secrets — validated as non-empty only, never
 // numerically (see Config.secret). Everything else in the section is numeric.
 export const TOKEN_SECRET_FIELD_KEYS = new Set(
-  TOKEN_VALIDATION_CONFIGS.filter((cfg) => cfg.secret).map((cfg) => cfg.key)
+  TOKEN_VALIDATION_CONFIGS.filter((cfg) => cfg.secret).map((cfg) => cfg.key),
 );
 
 export const isFieldEmpty = (field: string | boolean | number): boolean => {
@@ -404,11 +444,7 @@ export const isNotValidNumber = (field: string | boolean | number): boolean => {
 export type ConfigTab = 'auth' | 'smtp' | 'proxy' | 'rate-limit';
 export type ConfigSubTab = 'auth-providers' | 'token';
 export type ConfigSectionId =
-  | SsoAuthProviders
-  | 'email'
-  | 'token'
-  | 'rate_limit'
-  | 'proxy';
+  SsoAuthProviders | 'email' | 'token' | 'rate_limit' | 'proxy';
 
 // What's wrong with a value; maps via GUARD_BY_KIND to its save guard / toast.
 export type ConfigIssueKind =
@@ -443,20 +479,19 @@ const lookupEnvVar = (configs: Config[], key: string): string =>
   configs.find((cfg) => cfg.key === key)?.name ?? '';
 
 const emptyOrInvalidNumber = (
-  value: string | boolean | number
+  value: string | boolean | number,
 ): ConfigIssueKind =>
-  typeof value === 'string' && value.trim() === ''
-    ? 'empty'
-    : 'invalid-number';
+  typeof value === 'string' && value.trim() === '' ? 'empty' : 'invalid-number';
 
 const PROVIDER_CONFIGS: Record<SsoAuthProviders, Config[]> = {
+  oidc: OIDC_CONFIGS,
   google: GOOGLE_CONFIGS,
   github: GITHUB_CONFIGS,
   microsoft: MICROSOFT_CONFIGS,
 };
 
 export const getConfigValidationIssues = (
-  config: ServerConfigs
+  config: ServerConfigs,
 ): ConfigValidationIssue[] => {
   const issues: ConfigValidationIssue[] = [];
 
@@ -468,6 +503,8 @@ export const getConfigValidationIssues = (
     if (!provider.enabled) return;
 
     Object.entries(provider.fields).forEach(([fieldKey, value]) => {
+      if (PROVIDER_CONFIGS[name].find((c) => c.key === fieldKey)?.optional)
+        return;
       if (isFieldEmpty(value)) {
         issues.push({
           tab: 'auth',
@@ -528,7 +565,7 @@ export const getConfigValidationIssues = (
           fieldKey,
           envVar: lookupEnvVar(
             [...MAIL_CONFIGS, ...CUSTOM_MAIL_CONFIGS],
-            fieldKey
+            fieldKey,
           ),
           kind: 'empty',
         });
@@ -622,17 +659,19 @@ export const getConfigValidationIssues = (
 
   // Rate limit → rate-limit
   // Both fields are unconditionally required numerics — no enable toggle.
-  Object.entries(config.rateLimitConfigs.fields).forEach(([fieldKey, value]) => {
-    if (isNotValidNumber(value)) {
-      issues.push({
-        tab: 'rate-limit',
-        section: 'rate_limit',
-        fieldKey,
-        envVar: lookupEnvVar(RATE_LIMIT_CONFIGS, fieldKey),
-        kind: emptyOrInvalidNumber(value),
-      });
-    }
-  });
+  Object.entries(config.rateLimitConfigs.fields).forEach(
+    ([fieldKey, value]) => {
+      if (isNotValidNumber(value)) {
+        issues.push({
+          tab: 'rate-limit',
+          section: 'rate_limit',
+          fieldKey,
+          envVar: lookupEnvVar(RATE_LIMIT_CONFIGS, fieldKey),
+          kind: emptyOrInvalidNumber(value),
+        });
+      }
+    },
+  );
 
   // Proxy URL → proxy
   // Required unconditionally (no enable toggle). The if/else ordering matters:
@@ -664,17 +703,17 @@ export const getConfigValidationIssues = (
 // True when any issue maps to the given save guard.
 export const hasGuardIssue = (
   issues: ConfigValidationIssue[],
-  guard: ConfigGuard
+  guard: ConfigGuard,
 ): boolean => issues.some((issue) => GUARD_BY_KIND[issue.kind] === guard);
 
 // Proactive — drives indicator dots without waiting for a save attempt.
 export const tabHasConfigIssue = (
   issues: ConfigValidationIssue[],
   tab: ConfigTab,
-  subTab?: ConfigSubTab
+  subTab?: ConfigSubTab,
 ): boolean =>
   issues.some(
-    (issue) => issue.tab === tab && (!subTab || issue.subTab === subTab)
+    (issue) => issue.tab === tab && (!subTab || issue.subTab === subTab),
   );
 
 /* Provide/inject (not module singleton) so an unscoped consumer throws loudly instead of
@@ -707,7 +746,7 @@ export const useConfigValidation = () => {
     throw new Error(
       'useConfigValidation() must be used under a component that called ' +
         'provideConfigValidation() (settings.vue). These config components read ' +
-        'validation state from that provider and cannot be mounted standalone.'
+        'validation state from that provider and cannot be mounted standalone.',
     );
   }
 
@@ -715,7 +754,7 @@ export const useConfigValidation = () => {
   const isConfigFieldErrored = (section: ConfigSectionId, fieldKey: string) =>
     context.configEdited.value &&
     context.configValidationIssues.value.some(
-      (issue) => issue.section === section && issue.fieldKey === fieldKey
+      (issue) => issue.section === section && issue.fieldKey === fieldKey,
     );
 
   return { ...context, isConfigFieldErrored };

@@ -189,3 +189,6 @@ devenv.local.nix
 .aider*
 .windsurfrules
 .agents
+
+# Isolated OIDC test credentials and trust material
+packages/hoppscotch-backend/test/oidc/.local/

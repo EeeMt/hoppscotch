@@ -109,14 +109,15 @@ const setInitialUser = async () => {
       }
     }
   } else if (res.data?.me) {
-    const { uid, displayName, email, photoURL, isAdmin } = res.data.me;
+    const { uid, displayName, email, photoURL, isAdmin, emailVerified } =
+      res.data.me;
 
     const hoppUser: HoppUser = {
       uid,
       displayName,
       email,
       photoURL,
-      emailVerified: true,
+      emailVerified,
       isAdmin,
     };
 
@@ -183,6 +184,14 @@ export const auth = {
     const urlObject = new URL(url);
     const searchParams = new URLSearchParams(urlObject.search);
     return Boolean(searchParams.get('token'));
+  },
+
+  signInUserWithOIDC: () => {
+    const url = new URL(
+      `${import.meta.env.VITE_BACKEND_API_URL.replace(/\/+$/, '')}/auth/oidc`,
+    );
+    url.searchParams.set('redirect_uri', import.meta.env.VITE_ADMIN_URL);
+    window.location.assign(url.href);
   },
 
   signInUserWithGoogle: () => {
@@ -280,15 +289,11 @@ export const auth = {
   },
 
   addOnBoardingConfigs: async (config: Record<string, any>) => {
-    try {
-      const res = await authQuery.addOnBoardingConfigs(config);
-      return res.data as {
-        token: string;
-      };
-    } catch (err) {
-      console.error(err);
-      return null;
-    }
+    // Let the form report failures without logging Axios request credentials.
+    const res = await authQuery.addOnBoardingConfigs(config);
+    return res.data as {
+      token: string;
+    };
   },
 
   getOnboardingConfigs: async (token: string) => {
