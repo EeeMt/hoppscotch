@@ -204,7 +204,18 @@
     "we_sent_magic_link": "We sent you a magic link!",
     "we_sent_magic_link_description": "Check your inbox - we sent an email to {email}. It contains a magic link that will log you in.",
     "continue_oidc": "Continue with OpenID Connect",
-    "oidc_failure": "Unable to sign in. Please try again."
+    "oidc_failure": "Unable to sign in. Please try again.",
+    "oidc_welcome": "Welcome to your workspace",
+    "oidc_welcome_description": "Keep your collections in sync and collaborate with your team.",
+    "oidc_login_description": "Continue with your organization account",
+    "oidc_login_note": "You'll be taken to your identity provider, then returned here.",
+    "oidc_redirecting": "Connecting to sign-in…",
+    "oidc_other_options": "Other sign-in options",
+    "logout_title": "Sign out of your workspace?",
+    "logout_description": "Sign back in anytime to sync your API collections and collaborate with your team.",
+    "logout_sso_note": "If you use SSO, this only signs you out of Hoppscotch. Your organization account stays signed in.",
+    "logging_out": "Signing out…",
+    "logout_failure": "Unable to sign out. Please try again."
   },
   "authorization": {
     "generate_token": "Generate Token",

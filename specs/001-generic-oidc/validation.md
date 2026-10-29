@@ -1,6 +1,6 @@
 # OIDC implementation validation
 
-Date: 2026-10-28. Status: Web implementation and acceptance complete. The user explicitly removed native desktop build/runtime acceptance from this delivery; browser device-login/loopback evidence remains recorded separately.
+Date: 2026-10-29. Status: Web implementation and acceptance complete, with the LAN login-dialog refresh below. The user explicitly removed native desktop build/runtime acceptance from this delivery; browser device-login/loopback evidence remains recorded separately.
 
 ## Current verified result
 
@@ -16,7 +16,25 @@ Implementation commit: `69c9e4cbf` (`feat(auth): add generic OIDC sign-in for se
 | Fixture browser recovery and bilingual controls | App/admin return and retry passed; 20 Me queries, no outside-allowlist requests |
 | Credential scan | No known live credential/key matches; local credentials, trust material and offline archive ignored |
 
-The isolated test deployment and offline archive contain image `sha256:f2ccf3ea4412381f062c6b70cd1316864a171bf496ed5f42239a67f6565aed04`. Existing unrelated frontend typecheck failures and the six legacy auth-controller lint errors are documented below. Native desktop build/runtime is excluded by the user's explicit scope decision. The following sections retain earlier acceptance runs and review history; the table above is the latest result.
+The baseline image and offline archive contain `sha256:f2ccf3ea4412381f062c6b70cd1316864a171bf496ed5f42239a67f6565aed04`. The LAN deployment now uses the Web-only update below. Existing unrelated frontend typecheck failures and the six legacy auth-controller lint errors are documented below. Native desktop build/runtime is excluded by the user's explicit scope decision. The following sections retain earlier acceptance runs and review history.
+
+## LAN login-dialog refresh — 2026-10-29
+
+- The Web OIDC selector now includes the Hoppscotch logo, workspace introduction, a prominent organization-account action, and a localized explanation of the identity-provider redirect. Colors follow the existing theme and accent settings. Other configured login methods remain available.
+- The action exposes an accessible label, description, keyboard focus indicator and busy state. Duplicate clicks are ignored. A synchronous or asynchronous launch failure allows retry, and `pageshow` restores the button after browser Back.
+- Common component and OIDC helper suites: **11 tests passed in 3 files**. Covers the single action, named providers, other login methods, disabled OIDC, progress, duplicate navigation, failure/retry and browser-return event. Affected Vue files pass ESLint; the self-host Web production build passes.
+- Real Chrome checks: desktop English/light at 1440px and mobile Chinese/dark at 390px; the action remains inside the viewport, its translated accessible label is present, and neither viewport has horizontal page overflow. Enter opens the identity provider, browser Back permits another sign-in (reopening the dialog after a full reload), and Escape dismisses the dialog.
+- Real LAN Web/admin login, local refresh and logout passed using the isolated test account and normal TLS validation. **7 Me queries**, `emailVerified=false`, **0 outside-allowlist browser requests**. Native desktop acceptance remains excluded.
+- At the user's additional request, provider 11 retains an independent authentik authentication flow, `hoppscotch-oidc-validation-20261027-login`, with a persistent SVG background, sidebar layout, combined username/password form and password visibility control. All four original stage bindings and their password/MFA policy parameters are preserved. The shared brand/default flow and business applications are unchanged. The requested existing account still passes the application's access policy. The asset and scoped replay helper remain in ignored `.local/` files.
+- Current LAN app: `http://192.168.50.13:3000`; admin: `/admin`; API: `/backend/v1`. Runtime image `hoppscotch-oidc:login-ui`, ID `sha256:cf5cb82df50390a81077a7bd95a91bab44d4c6b23fde295d027bc129fcb745e6`, retains the baseline backend/admin and replaces only the built Web directory. Existing isolated database and runtime configuration are retained; container health passes.
+
+## Logout-dialog refresh — 2026-10-29
+
+- The common logout dialog now follows the login dialog's logo, spacing and accent treatment, displays the current account, and explains that local logout leaves an SSO identity-provider session intact. English and Chinese strings are included.
+- Confirmation remains visible while sign-out is pending. Duplicate submissions and dismissal are blocked during the request; a failure keeps the dialog open with an inline error and enables retry. Cancel receives initial focus, Escape cancels an idle dialog, and reopening clears previous errors. The existing organization redirect and logout shortcut remain intact.
+- Login/logout component and OIDC helper suites: **15 tests passed in 4 files**. Component tests use the actual shared modal and buttons for logout. Affected components and tests pass ESLint and formatting checks; the browser probe passes syntax and formatting checks; the self-host Web production build passes with an explicit local `VITE_BASE_URL`. Full self-host `vue-tsc --noEmit` still reports the previously documented common-module alias and GraphQL version/type failures.
+- Isolated Chrome component previews with simulated accounts passed desktop English/light, desktop Chinese/dark, mobile Chinese/light at 390px, mobile English/dark at 320px with long account details, and a platform without OIDC. No horizontal overflow was observed, all action buttons fit the viewport, and the SSO note follows platform support. Busy-state locking, duplicate prevention, failure/retry and successful dismissal passed without uncaught browser exceptions.
+- These logout checks cover local code and component previews. The LAN runtime image above remains the earlier login-dialog deployment; this logout refresh has not been deployed there, and no new identity-provider round trip is claimed for it.
 
 ## Environment
 

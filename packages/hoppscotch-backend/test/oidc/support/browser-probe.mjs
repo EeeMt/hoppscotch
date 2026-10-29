@@ -269,8 +269,9 @@ try {
           if (action && process.env.OIDC_EXPECT_IDP_CANCELLATION === '1')
             return;
         } else if (stage === 'username' && !identified) {
-          await evaluate(
-            `(() => { const e=${deep}; const input=e.find(x=>x.tagName==='INPUT'&&x.name==='uidField'); input.value=${JSON.stringify(live.username)}; input.dispatchEvent(new Event('input',{bubbles:true,composed:true})); (input.closest('form')?.querySelector('button[type=submit]') || e.find(x=>x.tagName==='BUTTON'&&x.type==='submit')).click(); })()`,
+          // authentik supports both a combined form and separate password stage.
+          passwordSent = await evaluate(
+            `(() => { const e=${deep}; const input=e.find(x=>x.tagName==='INPUT'&&x.name==='uidField'); input.value=${JSON.stringify(live.username)}; input.dispatchEvent(new Event('input',{bubbles:true,composed:true})); const password=e.find(x=>x.tagName==='INPUT'&&x.name==='password'); if(password){password.value=${JSON.stringify(live.password)}; password.dispatchEvent(new Event('input',{bubbles:true,composed:true}));} (input.closest('form')?.querySelector('button[type=submit]') || e.find(x=>x.tagName==='BUTTON'&&x.type==='submit')).click(); return Boolean(password); })()`,
           );
           identified = true;
         } else if (stage === 'password' && !passwordSent) {
@@ -461,13 +462,13 @@ try {
   );
   assert.equal(
     await evaluate(
-      `[...document.querySelectorAll('button,a')].filter(b => b.textContent.trim() === 'Continue with OpenID Connect').length`,
+      `[...document.querySelectorAll('button,a')].filter(b => (b.getAttribute('aria-label') === 'Continue with OpenID Connect' || b.textContent.trim() === 'Continue with OpenID Connect')).length`,
     ),
     1,
   );
   if (!live) await controls({ httpErrors: { token: 503 } });
   await evaluate(
-    `[...document.querySelectorAll('button,a')].find(b => b.textContent.trim() === 'Continue with OpenID Connect').click()`,
+    `[...document.querySelectorAll('button,a')].find(b => (b.getAttribute('aria-label') === 'Continue with OpenID Connect' || b.textContent.trim() === 'Continue with OpenID Connect')).click()`,
   );
   if (!live) {
     await until(
@@ -657,7 +658,7 @@ try {
   );
   if (!live) await controls({ httpErrors: { token: 503 } });
   await evaluate(
-    `[...document.querySelectorAll('button,a')].find(b => b.textContent.trim() === 'Continue with OpenID Connect').click()`,
+    `[...document.querySelectorAll('button,a')].find(b => (b.getAttribute('aria-label') === 'Continue with OpenID Connect' || b.textContent.trim() === 'Continue with OpenID Connect')).click()`,
   );
   if (!live) {
     await until(
@@ -781,7 +782,7 @@ try {
     'device OIDC item',
   );
   await evaluate(
-    `[...document.querySelectorAll('button,a')].find(b => b.textContent.trim() === 'Continue with OpenID Connect').click()`,
+    `[...document.querySelectorAll('button,a')].find(b => (b.getAttribute('aria-label') === 'Continue with OpenID Connect' || b.textContent.trim() === 'Continue with OpenID Connect')).click()`,
   );
   await authenticate();
   await until(
